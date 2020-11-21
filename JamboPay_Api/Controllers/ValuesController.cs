@@ -80,7 +80,9 @@ namespace JamboPay_Api.Controllers
                 try
                 {
                     //rollback the transaction if any error occurs during the process of inserting
+                    con.Open();
                     mysqlTrx.Rollback();
+                    con.Close();
                 }
                 catch (MySqlException ex2)
                 {
@@ -153,7 +155,9 @@ namespace JamboPay_Api.Controllers
                 try
                 {
                     //rollback the transaction if any error occurs during the process of inserting
+                    con.Open();
                     mysqlTrx.Rollback();
+                    con.Close();
                 }
                 catch (MySqlException ex2)
                 {
@@ -250,7 +254,9 @@ namespace JamboPay_Api.Controllers
                 try
                 {
                     //rollback the transaction if any error occurs during the process of inserting
+                    con.Open();
                     mysqlTrx.Rollback();
+                    con.Close();
                 }
                 catch (MySqlException ex2)
                 {
