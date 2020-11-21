@@ -5,7 +5,6 @@ using System.Data;
 using System.Globalization;
 using System.Linq;
 using System.Net;
-using System.Security.Cryptography;
 using System.Text;
 using System.Web.Http;
 using JamboPay_Api.Models;
@@ -17,150 +16,59 @@ namespace JamboPay_Api.Controllers
     [BasicAuthentication]
     public class ValuesController : ApiController
     {
-        ///uncomment this while publishing on live server
-
-        // public static string Baseurl = ConfigurationManager.AppSettings["API_SERVER_URL"];
-
-        ///uncomment this while publishing on live server
-
         ///for use on localhost testings
-
         public static string Baseurl = ConfigurationManager.AppSettings["API_LOCALHOST_URL"];
-
-        ///for use on localhost testings
-
+        
         /// API Authentications
         public static string ApiUsername = ConfigurationManager.AppSettings["API_USERNAME"];
         public static string ApiPassword = ConfigurationManager.AppSettings["API_PWD"];
         /// API Authentications
+       
+        /// MySQL Connection string
         public static readonly string ConString = @"datasource=localhost;port=3306;username=root;password=root;database=jambopay";
+
+        /// <summary>
+        /// START: Agents and Commisions functions
+        /// </summary>
+
         [Route("api/Values")]
-
         [HttpPost]
-        [Route("api/AddAmbassador")]
-        public IHttpActionResult AddAmbassador([FromBody] SignUpModel signUpModel)
+        [Route("api/AddAgent")]
+        public IHttpActionResult AddAgent([FromBody] SignUpModel signUpModel)
         {
-            try
-            {
-                if (!ModelState.IsValid)
-                {return BadRequest(ModelState);}
-
-                //now add supplied data to dB
-                if (string.IsNullOrWhiteSpace(signUpModel.FName))
-                    return Json("fnameEmpty");
-
-                if (string.IsNullOrWhiteSpace(signUpModel.LName))
-                    return Json("lnameEmpty");
-
-                if (string.IsNullOrWhiteSpace(signUpModel.Phonenumber))
-                    return Json("phonenoEmpty");
-
-                if (string.IsNullOrWhiteSpace(signUpModel.IdNumber))
-                    return Json("IDEmpty");
-
-                if (string.IsNullOrWhiteSpace(signUpModel.Email))
-                    return Json("EmailEmpty");
-
-                if (string.IsNullOrWhiteSpace(signUpModel.Password1))
-                    return Json("PasswordEmpty");
-
-                if (string.IsNullOrWhiteSpace(signUpModel.Password2))
-                    return Json("Password2Empty");
-
-                if (signUpModel.Password1 != signUpModel.Password2)
-                    return Json("PasswordMismatched");
-
-                using (MySqlConnection con = new MySqlConnection(ConString))
-                {
-                    string insertQry =
-                        "INSERT INTO users(fname, lname, phone_no, id_number, user_type, email, password) VALUES('" +
-                        signUpModel.FName + "', '" + signUpModel.LName + "', '" + signUpModel.Phonenumber + "', '" +
-                        signUpModel.IdNumber + "', 'ambassador', '" + signUpModel.Email + "', '" +
-                        EncryptP(signUpModel.Password2) + "' )";
-
-                    con.Open();
-                    MySqlCommand command = new MySqlCommand(insertQry, con);
-                    if (command.ExecuteNonQuery() == 1)
-                    {
-                        return Ok("success");
-                    }
-                    con.Close();
-                    return Ok("Error Occured!");
-                }
-              
-            }
-            catch (MySqlException ex)
-            {
-                return Ok(ex.Message);
-                //return Ok("Something went wrong, try later");
-            }
-        }
-
-
-        [HttpPost]
-        [Route("api/AddSupporter")]
-        public IHttpActionResult AddSupporter([FromBody] SignUpModel signUpModel)
-        {
+            MySqlTransaction mysqlTrx = (dynamic)null;
+            MySqlConnection con = (dynamic)null;
             try
             {
                 if (!ModelState.IsValid)
                 { return BadRequest(ModelState); }
 
                 //now add supplied data to dB
-                if (string.IsNullOrWhiteSpace(signUpModel.FName))
-                    return Json("fnameEmpty");
-
-                if (string.IsNullOrWhiteSpace(signUpModel.LName))
-                    return Json("lnameEmpty");
-
-                if (string.IsNullOrWhiteSpace(signUpModel.Phonenumber))
-                    return Json("phonenoEmpty");
-
-                if (string.IsNullOrWhiteSpace(signUpModel.IdNumber))
-                    return Json("IDEmpty");
 
                 if (string.IsNullOrWhiteSpace(signUpModel.Email))
                     return Json("EmailEmpty");
 
-                if (string.IsNullOrWhiteSpace(signUpModel.Password1))
-                    return Json("PasswordEmpty");
-
-                if (string.IsNullOrWhiteSpace(signUpModel.Password2))
-                    return Json("Password2Empty");
-
-                if (signUpModel.Password1 != signUpModel.Password2)
-                    return Json("PasswordMismatched");
-
-                using (MySqlConnection con = new MySqlConnection(ConString))
+                using ( con = new MySqlConnection(ConString))
                 {
                     string insertQry =
-                        "INSERT INTO users(fname, lname, phone_no, id_number, user_type, email, password) VALUES('" +
-                        signUpModel.FName + "', '" + signUpModel.LName + "', '" + signUpModel.Phonenumber + "', '" +
-                        signUpModel.IdNumber + "', 'supporter', '" + signUpModel.Email + "', '" +
-                        EncryptP(signUpModel.Password2) + "' )";
+                        "INSERT INTO agents(agent_email_id) VALUES(@agentEmailId)";
 
                     con.Open();
-                    string checkifExists = "SELECT * FROM supporters WHERE supporter_id = '" + signUpModel.Email + "' AND ambassador_id = '" + signUpModel.AmbassadorEmail + "'  LIMIT 1";
-
-                    MySqlCommand command0 = new MySqlCommand(checkifExists, con);
-                    if (command0.ExecuteNonQuery() == 1)
-                    {
-                        return Ok("Already Exists under supporters!");
-                    }
-                 //   con.Close();
                     MySqlCommand command = new MySqlCommand(insertQry, con);
+                    // Start a local transaction
+                    mysqlTrx = con.BeginTransaction();
+                    // assign both transaction object and connection to Command object for a pending local transaction
+                    command.Connection = con;
+                    command.Transaction = mysqlTrx;
+
+                    //use parametarized queries to prevent sql injection
+                    command.Parameters.AddWithValue("@agentEmailId",signUpModel.Email);
+
                     if (command.ExecuteNonQuery() == 1)
                     {
-                       // con.Open();
-                        string insertQry2 = "INSERT INTO supporters(ambassador_id, supporter_id) VALUES('" +
-                                            signUpModel.AmbassadorEmail + "','" + signUpModel.Email + "' )";
-
-                        MySqlCommand command2 = new MySqlCommand(insertQry2, con);
-                        if (command2.ExecuteNonQuery() == 1)
-                        {
-                            return Ok("success");
-                        }
-                       // con.Close();
+                        //commit the insert transaction to dB 
+                        mysqlTrx.Commit();
+                        return Ok("success");
                     }
                     con.Close();
                     return Ok("Error Occured!");
@@ -169,8 +77,23 @@ namespace JamboPay_Api.Controllers
             }
             catch (MySqlException ex)
             {
-                return Ok(ex.Message);
-                //return Ok("Something went wrong, try later");
+                try
+                {
+                    //rollback the transaction if any error occurs during the process of inserting
+                    mysqlTrx.Rollback();
+                }
+                catch (MySqlException ex2)
+                {
+                    if (mysqlTrx.Connection != null)
+                    {
+                        return Ok("An exception of type " + ex2.GetType() + " was encountered while attempting to roll back the transaction!");
+                    }
+                }
+                return Ok("No record was inserted due to this error: " + ex.Message);
+            }
+            finally
+            {
+                con.Close();
             }
         }
 
@@ -179,6 +102,8 @@ namespace JamboPay_Api.Controllers
         [Route("api/AddService")]
         public IHttpActionResult AddService([FromBody] ServiceModel serviceModel)
         {
+            MySqlTransaction mysqlTrx = (dynamic)null;
+            MySqlConnection con = (dynamic)null;
             try
             {
                 if (!ModelState.IsValid)
@@ -194,16 +119,29 @@ namespace JamboPay_Api.Controllers
                 if (string.IsNullOrWhiteSpace(serviceModel.ServiceCommisionPercent.ToString(CultureInfo.InvariantCulture)))
                     return Json("svcCommissionEmpty");
 
-                using (MySqlConnection con = new MySqlConnection(ConString))
+                using ( con = new MySqlConnection(ConString))
                 {
                     string insertQry =
-                        "INSERT INTO services(service_name, service_code, service_commission_percent) VALUES('" +
-                        serviceModel.ServiceName + "', '" + serviceModel.ServiceCode + "', '" + serviceModel.ServiceCommisionPercent + "' )";
+                        "INSERT INTO services(service_name, service_code, jambo_comm_percent) VALUES(@serviceName, @serviceCode, @serviceCommission )";
 
                     con.Open();
+                  
                     MySqlCommand command = new MySqlCommand(insertQry, con);
+                    // Start a local transaction
+                    mysqlTrx = con.BeginTransaction();
+                    // assign both transaction object and connection to Command object for a pending local transaction
+                    command.Connection = con;
+                    command.Transaction = mysqlTrx;
+
+                    //use parametarized queries to prevent sql injection
+                    command.Parameters.AddWithValue("@serviceName", serviceModel.ServiceName);
+                    command.Parameters.AddWithValue("@serviceCode", serviceModel.ServiceCode);
+                    command.Parameters.AddWithValue("@serviceCommission", serviceModel.ServiceCommisionPercent);
+
                     if (command.ExecuteNonQuery() == 1)
                     {
+                        //commit the insert transaction to dB 
+                        mysqlTrx.Commit();
                         return Ok("success");
                     }
                     con.Close();
@@ -212,74 +150,130 @@ namespace JamboPay_Api.Controllers
             }
             catch (MySqlException ex)
             {
-                return Ok(ex.Message);
-                //return Ok("Something went wrong, try later");
+                try
+                {
+                    //rollback the transaction if any error occurs during the process of inserting
+                    mysqlTrx.Rollback();
+                }
+                catch (MySqlException ex2)
+                {
+                    if (mysqlTrx.Connection != null)
+                    {
+                        return Ok("An exception of type " + ex2.GetType() +" was encountered while attempting to roll back the transaction!");
+                    }
+                }
+            
+            return Ok("No record was inserted due to this error: "+ex.Message);
+            }
+            finally
+            {
+                con.Close();
             }
         }
-
 
         [HttpPost]
         [Route("api/PostTransaction")]
         public IHttpActionResult PostTransaction([FromBody] CommissionModel commissionModel)
         {
-
+            MySqlTransaction mysqlTrx = (dynamic)null;
+            MySqlConnection con = (dynamic)null;
             try
             {
-                var totalCommission = (dynamic)null;
-                var supporterId = commissionModel.SupporterEmail;
 
                 WebClient wc = new WebClient();
                 wc.Headers.Add("Authorization", "Basic " + Convert.ToBase64String(Encoding.ASCII.GetBytes(ApiUsername + ":" + ApiPassword)));
+                var totalCommission = (dynamic)null;
+                var agentPaidAmt = (dynamic)null;
+                var jamboPaidAmt = (dynamic)null;
+
+                //get agent Id
+                string agentsjson = wc.DownloadString(Baseurl + "api/GetAgents");
+                var agts = JsonConvert.DeserializeObject<List<ServiceModel>>(agentsjson);
+                var agtresults = (from a in agts where a.agent_email_id == commissionModel.AgentEmailId select a.a_id).SingleOrDefault();
+                int agentId = Convert.ToInt32(agtresults);
+
+
+                //get service commission
                 string json = wc.DownloadString(Baseurl + "api/GetServices");
                 var svcs = JsonConvert.DeserializeObject<List<ServiceModel>>(json);
-                var jsresult = (from a in svcs where a.service_code == commissionModel.ServiceTypeCode select a.service_commission_percent).SingleOrDefault();
-                //assign commission % here
-                decimal srvComm = jsresult;
+                var jsresult = (from a in svcs where a.s_id == commissionModel.ServiceId select a.jambo_comm_percent).SingleOrDefault();
 
-                decimal srvFee = Convert.ToDecimal(commissionModel.ServiceFee);
+                //get total commission % here
+                decimal srvComm = jsresult;
+                decimal srvFee = Convert.ToDecimal(commissionModel.TransactionCost);
                 totalCommission = (srvComm / 100) * srvFee;
 
-                if (string.IsNullOrWhiteSpace(commissionModel.ServiceFee.ToString(CultureInfo.InvariantCulture)))
+                //subdivide commision between JamboPay and agents
+
+                //JamboPay gets
+                jamboPaidAmt = Convert.ToDecimal(0.6) * totalCommission;
+
+                //Agent gets
+                agentPaidAmt = Convert.ToDecimal(0.4) * totalCommission;
+
+                if (string.IsNullOrWhiteSpace(commissionModel.TransactionCost.ToString(CultureInfo.InvariantCulture)))
                     return Json("lsvcFeeEmpty");
 
-                using (MySqlConnection con = new MySqlConnection(ConString))
+                using ( con = new MySqlConnection(ConString))
                 {
+                    string insertQry =
+                        "INSERT INTO agent_transactions(service_id, agent_id, agent_transaction_cost, agent_commision_amt, jambo_commission_amt) " +
+                        "VALUES(@serviceId, @agentId, @trxCost, @agentCommAmt, @jamboCommAmt)";
 
                     con.Open();
-                    MySqlCommand command = con.CreateCommand();
-                    command.CommandType = CommandType.Text;
-                    command.CommandText = "SELECT * FROM supporters WHERE supporter_id= '" + supporterId + "' ";
-                    command.ExecuteNonQuery();
-                    DataTable dt = new DataTable();
-                    MySqlDataAdapter da = new MySqlDataAdapter(command);
-                    da.Fill(dt);
+                    MySqlCommand command = new MySqlCommand(insertQry, con);
+                    // Start a local transaction
+                    mysqlTrx = con.BeginTransaction();
+                    // assign both transaction object and connection to Command object for a pending local transaction
+                    command.Connection = con;
+                    command.Transaction = mysqlTrx;
 
-                    foreach (DataRow dr in dt.Rows)
+                    //use parametarized queries to prevent sql injection
+                    command.Parameters.AddWithValue("@serviceId", commissionModel.ServiceId);
+                    command.Parameters.AddWithValue("@agentId", agentId);
+                    command.Parameters.AddWithValue("@trxCost", commissionModel.TransactionCost);
+                    command.Parameters.AddWithValue("@agentCommAmt", agentPaidAmt);
+                    command.Parameters.AddWithValue("@jamboCommAmt", jamboPaidAmt);
+
+                    if (command.ExecuteNonQuery() == 1)
                     {
-                        //get all ambassadors the supporter represents.
-                        dynamic ambassadorId = dr["ambassador_id"] as string; //commissionModel.AmbassadorEmail;
-
-                        string insertQry =
-                            "INSERT INTO transactions(supporter_id, ambassador_id, service_code, transaction_cost, ambassador_commission ) VALUES('" +
-                            supporterId + "', '" + ambassadorId + "', '" + commissionModel.ServiceTypeCode + "', '" + srvFee + "', '" + totalCommission + "' )";
-
-                        MySqlCommand command2 = new MySqlCommand(insertQry, con);
-                        if (command2.ExecuteNonQuery() == 1)
-                        {
-                            return Ok("success");
-                        }
+                        //commit the insert transaction to dB 
+                        mysqlTrx.Commit();
+                        return Ok("success");
                     }
                     con.Close();
+                    return Ok("Error Occured!");
                 }
-
-                return Json("error");
             }
             catch (MySqlException ex)
             {
-                return Ok(ex.Message);
+                try
+                {
+                    //rollback the transaction if any error occurs during the process of inserting
+                    mysqlTrx.Rollback();
+                }
+                catch (MySqlException ex2)
+                {
+                    if (mysqlTrx.Connection != null)
+                    {
+                        return Ok("An exception of type " + ex2.GetType() + " was encountered while attempting to roll back the transaction!");
+                    }
+                }
+                return Ok("No record was inserted due to this error: " + ex.Message);
+            }
+            finally
+            {
+                con.Close();
             }
         }
+        /// <summary>
+        /// END: Agents and Commisions functions
+        /// </summary>
 
+
+        /// <summary>
+        /// Getter Functions
+        /// </summary>
 
         [HttpGet]
         [Route("api/GetServices")]
@@ -300,13 +294,57 @@ namespace JamboPay_Api.Controllers
         }
 
         [HttpGet]
-        [Route("api/GetPostedTransactions")]
-        public IHttpActionResult GetPostedTransactions()
+        [Route("api/GetAgentTransactions")]
+        public IHttpActionResult GetAgentTransactions([FromBody] TransactionsModel transactionsModel)
+        {
+            try
+            {
+                using (MySqlConnection con = new MySqlConnection(ConString))
+                {
+                    con.Open();
+
+                    string checkifAgentExists = "SELECT * FROM agents WHERE a_id = @aid LIMIT 1";
+                    //check if agent exists first
+                    MySqlCommand commandX = new MySqlCommand(checkifAgentExists, con);
+
+                    //use parametarized queries to prevent sql injection
+                    commandX.Parameters.AddWithValue("@aid", transactionsModel.AgentId);
+
+                    int agentIsThere = (int)commandX.ExecuteScalar();
+
+                    if (agentIsThere == 1)
+                    {
+                        string selectQuery = "SELECT a.agent_email_id, s.service_name, t.agent_transaction_cost " +
+                                             "FROM agent_transactions t, services s, agents a WHERE t.service_id = s.s_id AND t.agent_id = a.a_id AND t.agent_id = @agentId";
+                        //continue here if theAgents exists
+                        MySqlCommand command0 = new MySqlCommand(selectQuery, con);
+                        //use parametarized queries to prevent sql injection
+                        command0.Parameters.AddWithValue("@agentId", transactionsModel.AgentId);
+                        command0.ExecuteNonQuery();
+                        DataTable dt = new DataTable();
+                        MySqlDataAdapter da = new MySqlDataAdapter(command0);
+                        da.Fill(dt);
+                        con.Close();
+                        return Ok(dt);
+                    }
+                    return Ok("Agent not in Records yet!");
+                }
+            }
+            catch (Exception e)
+            {
+                return Ok(e.Message);
+            }
+           
+        }
+
+        [HttpGet]
+        [Route("api/GetAgents")]
+        public IHttpActionResult GetAgents()
         {
             using (MySqlConnection con = new MySqlConnection(ConString))
             {
                 con.Open();
-                string selectQuery = "SELECT * FROM transactions";
+                string selectQuery = "SELECT * FROM agents";
                 MySqlCommand command0 = new MySqlCommand(selectQuery, con);
                 command0.ExecuteNonQuery();
                 DataTable dt = new DataTable();
@@ -314,43 +352,47 @@ namespace JamboPay_Api.Controllers
                 da.Fill(dt);
                 con.Close();
                 return Json(dt);
-
             }
         }
 
         [HttpGet]
-        [Route("api/GetSupporters")]
-        public IHttpActionResult GetSupporters()
-        {
-            using (MySqlConnection con = new MySqlConnection(ConString))
-            {
-                con.Open();
-                string selectQuery = "SELECT * FROM supporters";
-                MySqlCommand command0 = new MySqlCommand(selectQuery, con);
-                command0.ExecuteNonQuery();
-                DataTable dt = new DataTable();
-                MySqlDataAdapter da = new MySqlDataAdapter(command0);
-                da.Fill(dt);
-                con.Close();
-                return Json(dt);
-            }
-        }
-
-        [HttpGet]
-        [Route("api/GetAmbassadorCommissionBalance")]
-        public IHttpActionResult GetAmbassadorCommissionBalance([FromBody] TransactionsModel transactionsModel)
+        [Route("api/GetAgentCommission")]
+        public IHttpActionResult GetAgentCommission([FromBody] TransactionsModel transactionsModel)
         {
             try
             {
                 var totalCommission = (dynamic)null;
-                var ambassadorId = transactionsModel.AmbassadorEmail;
-                WebClient wc = new WebClient();
-                wc.Headers.Add("Authorization", "Basic " + Convert.ToBase64String(Encoding.ASCII.GetBytes(ApiUsername + ":" + ApiPassword)));
-                string json = wc.DownloadString(Baseurl + "api/GetPostedTransactions");
-                var trx = JsonConvert.DeserializeObject<List<TransactionsModel>>(json);
-                var jsresult = (from a in trx where a.ambassador_id == ambassadorId select a.ambassador_commission).ToList();
-                totalCommission = jsresult.Sum();
-                return Ok("Total Commission: " + totalCommission);
+
+                using (MySqlConnection con = new MySqlConnection(ConString))
+                {
+                    con.Open();
+
+                    string checkifAgentExists = "SELECT * FROM agents WHERE a_id = @aid LIMIT 1";
+                    //check if agent exists first
+                    MySqlCommand commandX = new MySqlCommand(checkifAgentExists, con);
+
+                    //use parametarized queries to prevent sql injection
+                    commandX.Parameters.AddWithValue("@aid", transactionsModel.AgentId);
+
+                    int agentIsThere = (int)commandX.ExecuteScalar();
+                    if (agentIsThere == 1)
+                    {
+                        string selectQuery = "SELECT SUM(agent_commision_amt) AS totalComm FROM agent_transactions WHERE agent_id = @agentId";
+                        //continue here if theAgents exists
+                        MySqlCommand command0 = new MySqlCommand(selectQuery, con);
+                        //use parametarized queries to prevent sql injection
+                        command0.Parameters.AddWithValue("@agentId", transactionsModel.AgentId);
+                        command0.ExecuteNonQuery();
+                        DataTable dt = new DataTable();
+                        MySqlDataAdapter da = new MySqlDataAdapter(command0);
+                        da.Fill(dt);
+                        foreach (DataRow dr in dt.Rows)
+                        { totalCommission = dr["totalComm"]; }
+                        con.Close();
+                        return Ok("Total agent Commission: "+totalCommission);
+                    }
+                    return Ok("Agent not in Records yet!");
+                }
             }
             catch (MySqlException ex)
             {
@@ -358,14 +400,30 @@ namespace JamboPay_Api.Controllers
             }
         }
 
-        static string EncryptP(string mypass)
+
+        [HttpGet]
+        [Route("api/GetJamboPayRevenue")]
+        public IHttpActionResult GetJamboPayRevenue([FromBody] TransactionsModel transactionsModel)
         {
-            //encryptpassword:
-            using (MD5CryptoServiceProvider md5 = new MD5CryptoServiceProvider())
+            try
             {
-                UTF8Encoding utf8 = new UTF8Encoding();
-                byte[] data = md5.ComputeHash(utf8.GetBytes(mypass));
-                return Convert.ToBase64String(data);
+                using (MySqlConnection con = new MySqlConnection(ConString))
+                {
+                    con.Open();
+                    string selectQuery = "SELECT s.service_name, SUM(jambo_commission_amt) AS jambopay_total_revenue FROM services s, agent_transactions tr WHERE s.s_id = tr.service_id GROUP BY tr.service_id";
+
+                    MySqlCommand command0 = new MySqlCommand(selectQuery, con);
+                    command0.ExecuteNonQuery();
+                    DataTable dt = new DataTable();
+                    MySqlDataAdapter da = new MySqlDataAdapter(command0);
+                    da.Fill(dt);
+                    return Ok(dt);
+                   
+                }
+            }
+            catch (MySqlException ex)
+            {
+                return Ok(ex.Message);
             }
         }
     }

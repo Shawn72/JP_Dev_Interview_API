@@ -2,10 +2,10 @@
 {
     public class CommissionModel
     {
-        public string SupporterEmail { get; set; }
-        public string AmbassadorEmail { get; set; }
-        public string ServiceTypeCode { get; set; }
-        public string ServiceTypeCommision { get; set; }
-        public decimal ServiceFee { get; set; }
+        public string AgentEmailId { get; set; }
+        public int ServiceId { get; set; }
+        public decimal TransactionCost { get; set; }
+        public decimal JamboCommPaid { get; set; }
+        public decimal AgentCommPaid { get; set; }
     }
 }
