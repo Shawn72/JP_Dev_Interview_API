@@ -406,6 +406,32 @@ namespace JamboPay_Api.Controllers
             }
         }
 
+        [HttpGet]
+        [Route("api/GetSpecificAgentTotalCommission")]
+        public IHttpActionResult GetSpecificAgentTotalCommission([FromBody] TransactionsModel transactionsModel)
+        {
+            try
+            {
+                using (MySqlConnection con = new MySqlConnection(ConString))
+                {
+                    con.Open();
+                    string selectQuery = "SELECT a.agent_email_id, SUM(agent_commision_amt) AS agent_total_commission FROM agents a, agent_transactions tr WHERE a.a_id = tr.agent_id GROUP BY tr.agent_id";
+
+                    MySqlCommand command0 = new MySqlCommand(selectQuery, con);
+                    command0.ExecuteNonQuery();
+                    DataTable dt = new DataTable();
+                    MySqlDataAdapter da = new MySqlDataAdapter(command0);
+                    da.Fill(dt);
+                    return Ok(dt);
+
+                }
+            }
+            catch (MySqlException ex)
+            {
+                return Ok(ex.Message);
+            }
+        }
+
 
         [HttpGet]
         [Route("api/GetJamboPayRevenue")]
